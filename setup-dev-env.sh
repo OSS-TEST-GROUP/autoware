@@ -186,6 +186,7 @@ fi
 python3 -m pipx ensurepath
 export PATH="${PIPX_BIN_DIR:=$HOME/.local/bin}:$PATH"
 pipx install --include-deps --force "ansible==6.*"
+pipx inject ansible "setuptools<70"
 
 # Install ansible collections
 echo -e "\e[36m"ansible-galaxy collection install -f -r "$SCRIPT_DIR/ansible-galaxy-requirements.yaml" "\e[m"

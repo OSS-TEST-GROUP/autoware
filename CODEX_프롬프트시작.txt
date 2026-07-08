@@ -1,0 +1,22 @@
+이 프로젝트는 Autoware partition 테스트 프로젝트입니다.
+
+먼저 프로젝트 루트의 CODEX_HANDOFF.md를 반드시 읽고, 그 내용을 기준으로 작업해 주세요.
+
+목표는 실제 센서 기반 주행이 아니라 planning simulator lane driving scenario입니다.
+
+원하는 최종 흐름은 다음입니다.
+
+1. perception / decision / control partition Docker 이미지 실행
+2. 각 컨테이너에서 top-level launch 하나씩 실행
+3. RViz2에서 2D Pose Estimate와 2D Goal Pose만 선택
+4. route 생성
+5. Auto 클릭
+6. simple planning simulator 기반으로 ego vehicle이 움직임
+
+중요 제약:
+- ros2 topic pub로 런타임 토픽을 수동 땜빵하지 마세요.
+- 실행 중인 컨테이너 안만 수정하지 말고, 소스 파일을 수정하세요.
+- 수정 대상은 주로 obigo_launch와 partition_config입니다.
+- ADAPI 중복 실행을 만들지 마세요.
+- RViz 2D Pose Estimate는 /initialpose3d로 고정되게 해주세요.
+- 먼저 현재 구조를 분석하고, 변경 계획을 설명한 뒤 파일을 수정하세요.

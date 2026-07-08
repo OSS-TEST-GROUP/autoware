@@ -1,0 +1,36 @@
+{
+  "packages": [
+    "autoware_automatic_pose_initializer",
+    "autoware_cuda_utils",
+    "autoware_dummy_perception_publisher",
+    "autoware_image_transport_decompressor",
+    "autoware_launch",
+    "autoware_map_height_fitter",
+    "autoware_pcl_extensions",
+    "autoware_perception_online_evaluator",
+    "autoware_pointcloud_preprocessor",
+    "autoware_probabilistic_occupancy_grid_map",
+    "autoware_tensorrt_yolox",
+    "autoware_velodyne_monitor",
+    "obigo_launch",
+    "perception_simulator_launch",
+    "tier4_dummy_object_rviz_plugin",
+    "tier4_localization_launch",
+    "tier4_map_launch",
+    "tier4_perception_launch",
+    "tier4_sensing_launch"
+  ],
+  "folders": [
+    "src/param",
+    "src/sensor_component",
+    "src/sensor_kit",
+    "src/universe/autoware.universe/launch/perception_simulator_launch",
+    "src/universe/autoware.universe/localization",
+    "src/universe/autoware.universe/map",
+    "src/universe/autoware.universe/obigo_launch",
+    "src/universe/autoware.universe/perception",
+    "src/universe/autoware.universe/sensing",
+    "src/universe/autoware.universe/visualization",
+    "src/vehicle"
+  ]
+}

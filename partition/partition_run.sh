@@ -140,7 +140,7 @@ set_variables() {
 
     # Set map path
     if [ "$MAP_PATH" != "" ]; then
-        MAP="-v ${MAP_PATH}:/autoware_map:ro -v /home/zeus/source/fastdds:/fastdds:rw"
+        MAP="-v ${MAP_PATH}:/autoware_map:ro -v /home/junohb/source/fastdds:/fastdds:rw"
     fi
 
     if [ "$DATA_PATH" != "" ]; then
@@ -205,7 +205,7 @@ main() {
     set -x
     docker run -it ${RM} --net=host ${GPU_FLAG} ${USER_ID} ${MOUNT_X} \
         -e XAUTHORITY=${XAUTHORITY} -e XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR -e NVIDIA_DRIVER_CAPABILITIES=all -v /etc/localtime:/etc/localtime:ro \
-        ${WORKSPACE} ${MAP} ${DATA} ${EXEC} ${IMAGE} \
+        ${WORKSPACE} ${MAP} ${DATA} ${EXEC} -v /home/junohb/source/ros2:/ros2 ${IMAGE} \
         ${LAUNCH_CMD}
 }
 

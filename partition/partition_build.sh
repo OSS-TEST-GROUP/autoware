@@ -312,7 +312,7 @@ build_base_images() {
     base_option+=("--set base-cuda.tags=$repo:cuda-latest")
 
     set -x
-    docker buildx bake ${base_option[@]}
+    docker buildx bake --allow=ssh ${base_option[@]}
     set +x
 }
 
@@ -362,9 +362,9 @@ build_images() {
 
     set -x
     if [ "$output_type" = "--push" ]; then
-        docker buildx bake ${build_option[@]} partition-multi-platform
+        docker buildx bake --allow=ssh ${build_option[@]} partition-multi-platform
     else
-        docker buildx bake ${build_option[@]} partition
+        docker buildx bake --allow=ssh ${build_option[@]} partition
     fi
     set +x
 }
