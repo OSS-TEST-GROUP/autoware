@@ -31,6 +31,7 @@ RM=""
 DATA_PATH=""
 EXEC_PATH=""
 EXEC=""
+HOST_SOURCE_DIR="${HOST_SOURCE_DIR:-$HOME/source}"
 
 # Function to print help message
 print_help() {
@@ -135,12 +136,15 @@ set_variables() {
     fi
     EXEC="-v ${EXEC_PATH}:/exec"
 
+    mkdir -p "${HOST_SOURCE_DIR}/ros2"
+
     # Set user ID and group ID to match the local user
     USER_ID="-e LOCAL_UID=$(id -u) -e LOCAL_GID=$(id -g) -e LOCAL_USER=$(id -un) -e LOCAL_GROUP=$(id -gn)"
 
     # Set map path
     if [ "$MAP_PATH" != "" ]; then
-        MAP="-v ${MAP_PATH}:/autoware_map:ro -v /home/junohb/source/fastdds:/fastdds:rw"
+        mkdir -p "${HOST_SOURCE_DIR}/fastdds"
+        MAP="-v ${MAP_PATH}:/autoware_map:ro -v ${HOST_SOURCE_DIR}/fastdds:/fastdds:rw"
     fi
 
     if [ "$DATA_PATH" != "" ]; then
@@ -199,13 +203,14 @@ main() {
         echo -e "${GREEN}MAP PATH(mounted):${NC} ${MAP_PATH}:/autoware_map"
     fi
     echo -e "${GREEN}LAUNCH CMD:${NC} ${LAUNCH_CMD}"
+    echo -e "${GREEN}HOST SOURCE DIR:${NC} ${HOST_SOURCE_DIR}"
     echo -e "${GREEN}-----------------------------------------------------------------${NC}"
 
     # Launch the container
     set -x
     docker run -it ${RM} --net=host ${GPU_FLAG} ${USER_ID} ${MOUNT_X} \
         -e XAUTHORITY=${XAUTHORITY} -e XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR -e NVIDIA_DRIVER_CAPABILITIES=all -v /etc/localtime:/etc/localtime:ro \
-        ${WORKSPACE} ${MAP} ${DATA} ${EXEC} -v /home/junohb/source/ros2:/ros2 ${IMAGE} \
+        ${WORKSPACE} ${MAP} ${DATA} ${EXEC} -v ${HOST_SOURCE_DIR}/ros2:/ros2 ${IMAGE} \
         ${LAUNCH_CMD}
 }
 

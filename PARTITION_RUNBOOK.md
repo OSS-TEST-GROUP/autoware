@@ -89,23 +89,24 @@ ls -al "$MAP_PATH"
 
 `/path/to/your/map` 같은 placeholder 경로를 그대로 쓰면 안 된다.
 
-## 3. partition_run.sh 고정 마운트 경로 확인
+## 3. partition_run.sh host source 경로
 
-현재 `partition/partition_run.sh`에는 아래 host path가 추가 마운트된다.
+`partition/partition_run.sh`는 host의 source cache 경로를 컨테이너에 추가 마운트한다.
+
+기본값은 현재 사용자 기준이다.
 
 ```text
-/home/junohb/source/fastdds
-/home/junohb/source/ros2
+$HOME/source/fastdds -> /fastdds
+$HOME/source/ros2    -> /ros2
 ```
 
-새 환경에서 같은 경로가 없다면 우선 디렉터리를 만든다.
+필요한 디렉터리는 실행 시 자동 생성된다.
+
+다른 경로를 쓰고 싶으면 `HOST_SOURCE_DIR` 환경변수로 바꿀 수 있다.
 
 ```bash
-mkdir -p /home/junohb/source/fastdds
-mkdir -p /home/junohb/source/ros2
+HOST_SOURCE_DIR=/data/autoware_source ./partition/partition_run.sh ...
 ```
-
-사용자명이 `junohb`가 아니라면 `partition/partition_run.sh`의 해당 경로를 현재 환경에 맞게 수정한다.
 
 ## 4. 이미지 빌드
 
@@ -379,4 +380,3 @@ docker ps
 ```bash
 docker stop <container-id>
 ```
-
