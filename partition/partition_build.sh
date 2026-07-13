@@ -46,6 +46,8 @@ partitions=()
 
 repo=""
 output_type="--load"
+ssh_allow_option=()
+ssh_set_option=()
 
 # Parse arguments
 parse_arguments() {
@@ -128,6 +130,18 @@ set_arch_lib_dir() {
     else
         echo "Unsupported platform: $platform"
         exit 1
+    fi
+}
+
+# Set SSH forwarding options for Docker BuildKit.
+set_ssh_options() {
+    if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "$SSH_AUTH_SOCK" ]; then
+        ssh_allow_option=("--allow=ssh")
+        ssh_set_option=("--set *.ssh=default")
+    else
+        ssh_allow_option=()
+        ssh_set_option=()
+        echo "SSH_AUTH_SOCK is not set or not a socket; building without SSH agent forwarding."
     fi
 }
 
@@ -298,7 +312,7 @@ build_base_images() {
     base_option+=("--progress=plain")
     base_option+=("-f $SCRIPT_DIR/docker-bake-base.hcl")
     base_option+=("--set *.context=$WORKSPACE_ROOT")
-    base_option+=("--set *.ssh=default")
+    base_option+=("${ssh_set_option[@]}")
     if [ "$output_type" = "--push" ]; then
         base_option+=("--set *.platform=linux/amd64,linux/arm64")
     else
@@ -311,8 +325,13 @@ build_base_images() {
     base_option+=("--set base.tags=$repo:latest")
     base_option+=("--set base-cuda.tags=$repo:cuda-latest")
 
+    base_targets=("base")
+    if [ "$option_no_cuda" != "true" ]; then
+        base_targets+=("base-cuda")
+    fi
+
     set -x
-    docker buildx bake --allow=ssh ${base_option[@]}
+    docker buildx bake ${ssh_allow_option[@]} ${base_option[@]} ${base_targets[@]}
     set +x
 }
 
@@ -346,7 +365,7 @@ build_images() {
     build_option+=("-f $SCRIPT_DIR/docker-bake.hcl")
     #build_option+=("-f $SCRIPT_DIR/docker-bake-cuda.hcl")
     build_option+=("--set *.context=$WORKSPACE_ROOT")
-    build_option+=("--set *.ssh=default")
+    build_option+=("${ssh_set_option[@]}")
     #build_option+=("--set *.platform=$platform")
     #build_option+=("--set *.platforms=linux/amd64,linux/arm64")
     build_option+=("--set *.args.ROS_DISTRO=$rosdistro")
@@ -362,9 +381,9 @@ build_images() {
 
     set -x
     if [ "$output_type" = "--push" ]; then
-        docker buildx bake --allow=ssh ${build_option[@]} partition-multi-platform
+        docker buildx bake ${ssh_allow_option[@]} ${build_option[@]} partition-multi-platform
     else
-        docker buildx bake --allow=ssh ${build_option[@]} partition
+        docker buildx bake ${ssh_allow_option[@]} ${build_option[@]} partition
     fi
     set +x
 }
@@ -380,6 +399,7 @@ set_cuda_options
 #set_build_options
 set_platform
 set_arch_lib_dir
+set_ssh_options
 load_env
 #copy_config
 clone_repositories
