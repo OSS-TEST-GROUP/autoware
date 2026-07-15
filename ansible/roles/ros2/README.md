@@ -29,11 +29,10 @@ The `ros2_installation_type` variable can also be found in:
 [./defaults/main.yaml](./defaults/main.yaml)
 
 For Universe, the `rosdistro` variable can also be found in:
-[../../playbooks/install_dev_env.yaml](../../playbooks/install_dev_env.yaml)
+[../../playbooks/universe.yaml](../../playbooks/universe.yaml)
 
 ```bash
-# Choose your ROS distribution
-rosdistro=humble  # or jazzy
+wget -O /tmp/amd64.env https://raw.githubusercontent.com/autowarefoundation/autoware/main/amd64.env && source /tmp/amd64.env
 
 # Taken from: https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html
 

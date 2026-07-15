@@ -18,4 +18,3 @@ WarningsAsErrors: "*"
 ExtraArgs:
   - -std=c++17
   - -Wno-c11-extensions
-  - -Wno-unknown-warning-option

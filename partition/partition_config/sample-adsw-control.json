@@ -1,0 +1,34 @@
+{
+  "packages": [
+    "autoware_adapi_adaptors",
+    "autoware_control_evaluator",
+    "autoware_default_adapi",
+    "autoware_diagnostic_graph_utils",
+    "autoware_dummy_perception_publisher",
+    "autoware_external_cmd_converter",
+    "autoware_fault_injection",
+    "autoware_launch",
+    "autoware_learning_based_vehicle_model",
+    "autoware_map_height_fitter",
+    "autoware_pcl_extensions",
+    "autoware_pointcloud_preprocessor",
+    "autoware_pose2twist",
+    "autoware_raw_vehicle_cmd_converter",
+    "autoware_route_handler",
+    "autoware_simple_planning_simulator",
+    "autoware_vehicle_door_simulator",
+    "obigo_launch",
+    "tier4_autoware_api_launch",
+    "tier4_control_launch",
+    "tier4_simulator_launch",
+    "tier4_vehicle_launch"
+  ],
+  "folders": [
+    "src/param",
+    "src/universe/autoware.universe/control",
+    "src/universe/autoware.universe/obigo_launch",
+    "src/universe/autoware.universe/vehicle",
+    "src/universe/autoware.universe/visualization",
+    "src/vehicle"
+  ]
+}

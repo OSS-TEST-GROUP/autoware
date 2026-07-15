@@ -1,17 +1,9 @@
 #!/usr/bin/env bash
-# DEPRECATED: superseded by ansible/scripts/install-ansible.sh +
-# `ansible-playbook autoware.dev_env.install_dev_env`. Scheduled for removal
-# on 2026-05-24. See https://github.com/autowarefoundation/autoware/issues/7052.
-#
 # Set up development environment for Autoware Core/Universe.
 # Usage: setup-dev-env.sh <ros2_installation_type('core' or 'universe')> [-y] [-v] [--no-nvidia]
 # Note: -y option is only for CI.
 
 set -e
-
-echo -e "\e[33m[DEPRECATED] setup-dev-env.sh will be removed on 2026-05-24.\e[m" >&2
-echo -e "\e[33mMigrate to: bash ansible/scripts/install-ansible.sh && ansible-playbook autoware.dev_env.install_dev_env [--tags ...]\e[m" >&2
-echo -e "\e[33mSee https://github.com/autowarefoundation/autoware/issues/7052\e[m" >&2
 
 # Function to print help message
 print_help() {
@@ -28,7 +20,6 @@ print_help() {
     echo "  --download-artifacts"
     echo "                  Download artifacts"
     echo "  --module        Specify the module (default: all)"
-    echo "  --ros-distro    Specify ROS distribution (humble or jazzy, default: humble)"
     echo ""
 }
 
@@ -75,10 +66,6 @@ while [ "$1" != "" ]; do
         ;;
     --module)
         option_module="$2"
-        shift
-        ;;
-    --ros-distro)
-        option_ros_distro="$2"
         shift
         ;;
     *)
@@ -159,10 +146,17 @@ if [ "$option_module" != "" ]; then
     ansible_args+=("--extra-vars" "module=$option_module")
 fi
 
-# Set ros-distro (default: humble)
-option_ros_distro="${option_ros_distro:-humble}"
-export ROS_DISTRO="$option_ros_distro"
-ansible_args+=("--extra-vars" "rosdistro=$option_ros_distro")
+# Load env
+source "$SCRIPT_DIR/amd64.env"
+if [ "$(uname -m)" = "aarch64" ]; then
+    source "$SCRIPT_DIR/arm64.env"
+fi
+
+# Add env args
+# shellcheck disable=SC2013
+for env_name in $(sed -e "s/^\s*//" -e "/^#/d" -e "s/=.*//" <amd64.env); do
+    ansible_args+=("--extra-vars" "${env_name}=${!env_name}")
+done
 
 # Install sudo
 if ! (command -v sudo >/dev/null 2>&1); then
@@ -185,13 +179,14 @@ fi
 # Install pipx for ansible
 if ! (python3 -m pipx --version >/dev/null 2>&1); then
     sudo apt-get -y update
-    sudo apt-get -y install pipx
+    python3 -m pip install --user pipx
 fi
 
 # Install ansible
 python3 -m pipx ensurepath
 export PATH="${PIPX_BIN_DIR:=$HOME/.local/bin}:$PATH"
-pipx install --include-deps --force "ansible==10.*"
+pipx install --include-deps --force "ansible==6.*"
+pipx inject ansible "setuptools<70"
 
 # Install ansible collections
 echo -e "\e[36m"ansible-galaxy collection install -f -r "$SCRIPT_DIR/ansible-galaxy-requirements.yaml" "\e[m"

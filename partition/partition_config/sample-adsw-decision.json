@@ -1,0 +1,24 @@
+{
+  "packages": [
+    "autoware_external_cmd_selector",
+    "autoware_lane_departure_checker",
+    "autoware_launch",
+    "autoware_map_height_fitter",
+    "autoware_map_loader",
+    "autoware_map_projection_loader",
+    "autoware_planning_evaluator",
+    "obigo_launch",
+    "tier4_autoware_api_launch",
+    "tier4_dummy_object_rviz_plugin",
+    "tier4_planning_launch",
+    "tier4_system_launch"
+  ],
+  "folders": [
+    "src/param",
+    "src/universe/autoware.universe/obigo_launch",
+    "src/universe/autoware.universe/planning",
+    "src/universe/autoware.universe/system",
+    "src/universe/autoware.universe/visualization",
+    "src/vehicle"
+  ]
+}

@@ -1,0 +1,266 @@
+ARG BASE_IMAGE
+ARG AUTOWARE_BASE_IMAGE
+ARG AUTOWARE_BASE_CUDA_IMAGE
+#ARG PARTITION_NAME
+ARG LIB_DIR
+
+
+
+
+
+# hadolint ignore=DL3006
+FROM $BASE_IMAGE AS rosdep-depend
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG ROS_DISTRO
+ARG LIB_DIR
+
+COPY setup-dev-env.sh ansible-galaxy-requirements.yaml amd64.env arm64.env /autoware/
+COPY ansible/ /autoware/ansible/
+COPY docker/scripts/cleanup_apt.sh /autoware/cleanup_apt.sh
+RUN chmod +x /autoware/cleanup_apt.sh
+COPY docker/scripts/resolve_rosdep_keys.sh /autoware/resolve_rosdep_keys.sh
+RUN chmod +x /autoware/resolve_rosdep_keys.sh
+WORKDIR /autoware
+
+RUN rm -f /etc/apt/apt.conf.d/docker-clean \
+  && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache
+RUN --mount=type=ssh \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  ./setup-dev-env.sh -y rosdep \
+  && pip uninstall -y ansible ansible-core \
+  && /autoware/cleanup_apt.sh
+
+# Generate install package lists
+COPY src/core /autoware/src/core
+RUN rosdep update && /autoware/resolve_rosdep_keys.sh /autoware/src ${ROS_DISTRO} \
+  > /rosdep-core-depend-packages.txt \
+  && cat /rosdep-core-depend-packages.txt
+
+COPY src/universe/external /autoware/src/universe/external
+COPY src/universe/autoware.universe/common /autoware/src/universe/autoware.universe/common
+
+RUN /autoware/resolve_rosdep_keys.sh /autoware/src ${ROS_DISTRO} \
+  > /rosdep-universe-common-depend-packages.txt \
+  && cat /rosdep-universe-common-depend-packages.txt
+
+
+FROM rosdep-depend AS %PARTITION_NAME%-depend
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG ROS_DISTRO
+ARG LIB_DIR
+
+#########################################################
+%COPY_LIST%
+#########################################################
+
+RUN /autoware/resolve_rosdep_keys.sh /autoware/src ${ROS_DISTRO} \
+    > /rosdep-%PARTITION_NAME%-depend-packages.txt \
+    && cat /rosdep-%PARTITION_NAME%-depend-packages.txt
+RUN /autoware/resolve_rosdep_keys.sh /autoware/src ${ROS_DISTRO} \
+    > /rosdep-%PARTITION_NAME%-exec-depend-packages.txt \
+    && cat /rosdep-%PARTITION_NAME%-exec-depend-packages.txt
+
+
+# hadolint ignore=DL3006
+FROM $AUTOWARE_BASE_IMAGE AS core-devel
+#RUN echo "PARTITION_NAME: $PARTITION_NAME"
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG ROS_DISTRO
+ARG LIB_DIR
+
+ENV CCACHE_DIR="/root/.ccache"
+
+COPY docker/scripts/build_and_clean.sh /autoware/build_and_clean.sh
+RUN chmod +x /autoware/build_and_clean.sh
+
+# Set up development environment and tools
+RUN --mount=type=ssh \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  ./setup-dev-env.sh -y --module all --no-nvidia --no-cuda-drivers openadkit \
+  && ./setup-dev-env.sh -y --module dev-tools openadkit \
+  && pip uninstall -y ansible ansible-core \
+  && /autoware/cleanup_apt.sh
+
+# Install rosdep dependencies
+COPY --from=rosdep-depend /rosdep-core-depend-packages.txt /tmp/rosdep-core-depend-packages.txt
+# hadolint ignore=SC2002
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt-get update \
+  && cat /tmp/rosdep-core-depend-packages.txt | xargs apt-get install -y --no-install-recommends \
+  && /autoware/cleanup_apt.sh
+
+RUN --mount=type=cache,target=${CCACHE_DIR} \
+  --mount=type=bind,from=rosdep-depend,source=/autoware/src/core,target=/autoware/src/core \
+  source /opt/ros/"$ROS_DISTRO"/setup.bash \
+  && /autoware/build_and_clean.sh ${CCACHE_DIR} /opt/autoware
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["/bin/bash"]
+
+FROM core-devel AS universe-common-devel
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG ROS_DISTRO
+ARG LIB_DIR
+
+ENV CCACHE_DIR="/root/.ccache"
+
+# Install rosdep dependencies
+COPY --from=rosdep-depend /rosdep-universe-common-depend-packages.txt /tmp/rosdep-universe-common-depend-packages.txt
+# hadolint ignore=SC2002
+RUN --mount=type=ssh \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt-get update \
+  && cat /tmp/rosdep-universe-common-depend-packages.txt | xargs apt-get install -y --no-install-recommends \
+  && /autoware/cleanup_apt.sh
+
+# hadolint ignore=SC1091
+RUN --mount=type=cache,target=${CCACHE_DIR} \
+  --mount=type=bind,from=rosdep-depend,source=/autoware/src/universe/autoware.universe/common,target=/autoware/src/universe/autoware.universe/common \
+  --mount=type=bind,from=rosdep-depend,source=/autoware/src/universe/external,target=/autoware/src/universe/external \
+  source /opt/ros/"$ROS_DISTRO"/setup.bash \
+  && source /opt/autoware/setup.bash \
+  && /autoware/build_and_clean.sh ${CCACHE_DIR} /opt/autoware
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["/bin/bash"]
+
+FROM universe-common-devel AS universe-common-devel-cuda
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG LIB_DIR
+
+# Set up CUDA development environment
+# hadolint ignore=SC2002
+RUN --mount=type=ssh \
+  ./setup-dev-env.sh -y --module all --no-cuda-drivers openadkit \
+  && pip uninstall -y ansible ansible-core \
+  && /autoware/cleanup_apt.sh true
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["/bin/bash"]
+
+FROM universe-common-devel AS %PARTITION_NAME%-devel
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG ROS_DISTRO
+ARG LIB_DIR
+
+ENV CCACHE_DIR="/root/.ccache"
+
+# Install rosdep dependencies
+COPY --from=%PARTITION_NAME%-depend /rosdep-%PARTITION_NAME%-depend-packages.txt /tmp/rosdep-%PARTITION_NAME%-depend-packages.txt
+# hadolint ignore=SC2002
+RUN --mount=type=ssh \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt-get update \
+  && cat /tmp/rosdep-%PARTITION_NAME%-depend-packages.txt | xargs apt-get install -y --no-install-recommends \
+  && /autoware/cleanup_apt.sh
+
+# hadolint ignore=SC1091
+RUN --mount=type=cache,target=${CCACHE_DIR} \
+  %BIND_LIST%
+  source /opt/ros/"$ROS_DISTRO"/setup.bash \
+  && source /opt/autoware/setup.bash \
+  && /autoware/build_and_clean.sh ${CCACHE_DIR} /opt/autoware
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["/bin/bash"]
+
+
+FROM universe-common-devel-cuda AS %PARTITION_NAME%-devel-cuda
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG ROS_DISTRO
+ARG LIB_DIR
+
+ENV CCACHE_DIR="/root/.ccache"
+
+# Install rosdep dependencies
+COPY --from=%PARTITION_NAME%-depend /rosdep-%PARTITION_NAME%-depend-packages.txt /tmp/rosdep-%PARTITION_NAME%-depend-packages.txt
+# hadolint ignore=SC2002
+RUN --mount=type=ssh \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt-get update \
+  && cat /tmp/rosdep-%PARTITION_NAME%-depend-packages.txt | xargs apt-get install -y --no-install-recommends \
+  && /autoware/cleanup_apt.sh
+
+COPY --from=%PARTITION_NAME%-devel /opt/autoware /opt/autoware
+
+# hadolint ignore=SC1091
+RUN --mount=type=cache,target=${CCACHE_DIR} \
+  %BIND_LIST%
+  source /opt/ros/"$ROS_DISTRO"/setup.bash \
+  && source /opt/autoware/setup.bash \
+  && /autoware/build_and_clean.sh ${CCACHE_DIR} /opt/autoware
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["/bin/bash"]
+
+
+
+# hadolint ignore=DL3006
+FROM $AUTOWARE_BASE_IMAGE AS %PARTITION_NAME%
+#ARG LIB_DIR
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG ROS_DISTRO
+ARG SETUP_ARGS
+ARG TARGETPLATFORM
+
+# Set up runtime environment and artifacts
+COPY --from=%PARTITION_NAME%-depend /rosdep-%PARTITION_NAME%-exec-depend-packages.txt /tmp/rosdep-%PARTITION_NAME%-exec-depend-packages.txt
+
+# hadolint ignore=SC2002
+RUN --mount=type=ssh \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  ./setup-dev-env.sh -y --module all --no-nvidia --no-cuda-drivers --runtime openadkit \
+  && pip uninstall -y ansible ansible-core \
+  && apt-get update \
+  && cat /tmp/rosdep-%PARTITION_NAME%-exec-depend-packages.txt | xargs apt-get install -y --no-install-recommends \
+  && if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+      export LIB_DIR="x86_64"; \
+     elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+      export LIB_DIR="aarch64"; \
+     fi \
+  && echo "LIB_DIR ==============================is $LIB_DIR" \
+  && /autoware/cleanup_system.sh $LIB_DIR $ROS_DISTRO
+
+COPY --from=%PARTITION_NAME%-devel /opt/autoware /opt/autoware
+
+# Copy bash aliases
+COPY docker/etc/.bash_aliases /root/.bash_aliases
+RUN echo "source /opt/autoware/setup.bash" > /etc/bash.bashrc
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["/bin/bash"]
+
+
+FROM $AUTOWARE_BASE_CUDA_IMAGE AS %PARTITION_NAME%-cuda
+#ARG LIB_DIR
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG ROS_DISTRO
+ARG TARGETPLATFORM
+
+# Set up runtime environment and artifacts
+COPY --from=%PARTITION_NAME%-depend /rosdep-%PARTITION_NAME%-exec-depend-packages.txt /tmp/rosdep-%PARTITION_NAME%-exec-depend-packages.txt
+
+# hadolint ignore=SC2002
+RUN --mount=type=ssh \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  ./setup-dev-env.sh -y --module all --no-nvidia --no-cuda-drivers --runtime openadkit \
+  && pip uninstall -y ansible ansible-core \
+  && apt-get update \
+  && cat /tmp/rosdep-%PARTITION_NAME%-exec-depend-packages.txt | xargs apt-get install -y --no-install-recommends \
+  && if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+      export LIB_DIR="x86_64"; \
+     elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+      export LIB_DIR="aarch64"; \
+     fi \
+  && echo "LIB_DIR =============================is $LIB_DIR" \
+  && /autoware/cleanup_system.sh $LIB_DIR $ROS_DISTRO
+
+COPY --from=%PARTITION_NAME%-devel-cuda /opt/autoware /opt/autoware
+
+# Copy bash aliases
+COPY docker/etc/.bash_aliases /root/.bash_aliases
+RUN echo "source /opt/autoware/setup.bash" > /etc/bash.bashrc
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["/bin/bash"]
+

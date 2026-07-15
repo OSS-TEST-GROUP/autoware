@@ -14,15 +14,13 @@ artifacts:
       source:
         vcstool:
           repositories_files:
-            - repositories/autoware.repos
-            - repositories/simulator.repos
+            - autoware.repos
+            - simulator.repos
           import_path: src
       environment_variables:
         AUTOWARE_PATH: /opt/autoware
         DEBIAN_FRONTEND: noninteractive
         LANG: C.UTF-8
-      linux_parameters:
-        kernel_version: 5.19.0-50-generic
       phases:
         - name: environment-setup
           user: root
@@ -48,6 +46,7 @@ artifacts:
               - .webauto-ci/main/autoware-setup/**/*
               - ansible/**/*
               - ansible-galaxy-requirements.yaml
+              - amd64.env
           incremental_build:
             enabled: true
         - name: autoware-build
@@ -91,7 +90,6 @@ simulations:
         vehicle_model: sample_vehicle
         sensor_model: sample_sensor_kit
         initialize_duration: "90"
-        launch_visualization: "false"
 
 release:
   components:

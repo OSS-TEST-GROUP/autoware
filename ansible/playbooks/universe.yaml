@@ -1,16 +1,10 @@
-# DEPRECATED: superseded by install_dev_env.yaml.
-# Scheduled for removal on 2026-05-24. See https://github.com/autowarefoundation/autoware/issues/7052.
-
 - name: Set up source development environments for Autoware Universe
   hosts: localhost
   connection: local
-  module_defaults:
-    ansible.builtin.get_url:
-      timeout: 300
   vars_prompt:
     - name: prompt_install_nvidia
       prompt: |-
-        [Warning] Some Autoware components depend on the CUDA, and TensorRT NVIDIA libraries which have end-user license agreements that should be reviewed before installation.
+        [Warning] Some Autoware components depend on the CUDA, cuDNN and TensorRT NVIDIA libraries which have end-user license agreements that should be reviewed before installation.
         Install NVIDIA libraries? [y/N]
       private: false
     - name: prompt_download_artifacts
@@ -26,15 +20,17 @@
   pre_tasks:
     - name: Verify OS
       ansible.builtin.fail:
-        msg: Only Ubuntu 22.04 and 24.04 are supported for this branch. Please refer to https://autowarefoundation.github.io/autoware-documentation/main/installation/autoware/source-installation/.
-      when: ansible_distribution_version not in ['22.04', '24.04']
+        msg: Only Ubuntu 22.04 is supported for this branch. Please refer to https://autowarefoundation.github.io/autoware-documentation/main/installation/autoware/source-installation/.
+      when: ansible_distribution_version != '22.04'
 
     - name: Print args
       ansible.builtin.debug:
         msg:
           - rosdistro: "{{ rosdistro }}"
-          - cuda_version: "{{ cuda_version | default('(role default)') }}"
-          - tensorrt_version: "{{ tensorrt_version | default('(role default)') }}"
+          - rmw_implementation: "{{ rmw_implementation }}"
+          - cuda_version: "{{ cuda_version }}"
+          - cudnn_version: "{{ cudnn_version }}"
+          - tensorrt_version: "{{ tensorrt_version }}"
 
     - name: Show a warning if the NVIDIA libraries will not be installed
       ansible.builtin.pause:
@@ -47,21 +43,16 @@
     - role: autoware.dev_env.ros2
     - role: autoware.dev_env.ros2_dev_tools
     - role: autoware.dev_env.rmw_implementation
-      vars:
-        rmw_implementation__rosdistro: "{{ rosdistro }}"
     - role: autoware.dev_env.gdown
     - role: autoware.dev_env.build_tools
-    - role: autoware.dev_env.agnocast
-      when: rosdistro == 'humble'
 
     # Autoware module dependencies
-    - role: autoware.dev_env.acados
     - role: autoware.dev_env.geographiclib
     - role: autoware.dev_env.cuda
       when: prompt_install_nvidia == 'y'
+    - role: autoware.dev_env.pacmod
+      when: rosdistro != 'rolling'
     - role: autoware.dev_env.tensorrt
-      when: prompt_install_nvidia == 'y'
-    - role: autoware.dev_env.spconv
       when: prompt_install_nvidia == 'y'
 
     # Autoware devel dependencies

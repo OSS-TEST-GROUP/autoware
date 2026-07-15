@@ -18,7 +18,7 @@ sudo apt-get -y install pipx
 python3 -m pipx ensurepath
 
 # Install ansible
-pipx install --include-deps --force "ansible==10.*"
+pipx install --include-deps --force "ansible==6.*"
 ```
 
 ### Install ansible collections

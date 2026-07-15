@@ -1,35 +1,26 @@
 # tensorrt
 
-This role installs TensorRT following [the official NVIDIA TensorRT Installation Guide](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html#installing).
+This role installs TensorRT and cuDNN following [the official NVIDIA TensorRT Installation Guide](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html#installing).
 
 ## Inputs
 
 | Name             | Required | Description              |
 | ---------------- | -------- | ------------------------ |
+| cudnn_version    | true     | The version of cuDNN.    |
 | tensorrt_version | true     | The version of TensorRT. |
 
 ## Manual Installation
 
-### Set up the environment variables
-
 ```bash
-# From the Autoware repository root:
-# defaults/main.yaml contains an architecture-dependent Jinja2 expression;
-# extract the matching version for this machine.
-if [ "$(uname -m)" = "aarch64" ]; then
-  tensorrt_version=$(grep -oP "'\K[^']+(?=' if)" ansible/roles/tensorrt/defaults/main.yaml)
-else
-  tensorrt_version=$(grep -oP "else '\K[^']+" ansible/roles/tensorrt/defaults/main.yaml)
-fi
-```
+# For the environment variables
+wget -O /tmp/amd64.env https://raw.githubusercontent.com/autowarefoundation/autoware/main/amd64.env && source /tmp/amd64.env
 
-### Install TensorRT
-
-```bash
 sudo apt-get install -y \
+libcudnn8=${cudnn_version} \
 libnvinfer10=${tensorrt_version} \
 libnvinfer-plugin10=${tensorrt_version} \
 libnvonnxparsers10=${tensorrt_version} \
+libcudnn8-dev=${cudnn_version} \
 libnvinfer-dev=${tensorrt_version} \
 libnvinfer-plugin-dev=${tensorrt_version} \
 libnvinfer-headers-dev=${tensorrt_version} \
@@ -37,9 +28,11 @@ libnvinfer-headers-plugin-dev=${tensorrt_version} \
 libnvonnxparsers-dev=${tensorrt_version}
 
 sudo apt-mark hold \
+libcudnn8 \
 libnvinfer10 \
 libnvinfer-plugin10 \
 libnvonnxparsers10 \
+libcudnn8-dev \
 libnvinfer-dev \
 libnvinfer-plugin-dev \
 libnvonnxparsers-dev \

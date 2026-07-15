@@ -1,20 +1,18 @@
-# DEPRECATED: superseded by install_docker.yaml.
-# Scheduled for removal on 2026-05-24. See https://github.com/autowarefoundation/autoware/issues/7052.
-
 - name: Set up Docker development environments for Autoware
   hosts: localhost
   connection: local
   vars_prompt:
     - name: prompt_install_nvidia
       prompt: |-
-        [Warning] Some Autoware components depend on the CUDA, and TensorRT NVIDIA libraries which have end-user license agreements that should be reviewed before installation.
+        [Warning] Some Autoware components depend on the CUDA, cuDNN and TensorRT NVIDIA libraries which have end-user license agreements that should be reviewed before installation.
         Install NVIDIA libraries? [y/N]
       private: false
   pre_tasks:
     - name: Print args
       ansible.builtin.debug:
         msg:
-          - cuda_version: "{{ cuda_version | default('(role default)') }}"
+          - cuda_version: "{{ cuda_version }}"
+          - cudnn_version: "{{ cudnn_version }}"
     - name: Show a warning if the NVIDIA libraries will not be installed
       ansible.builtin.pause:
         seconds: 10
