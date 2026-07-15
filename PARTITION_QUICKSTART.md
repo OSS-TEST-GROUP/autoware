@@ -261,13 +261,3 @@ ros2 node list | sort | uniq -d
 ## 12. CUDA
 
 현재 배포 및 테스트 절차에서는 CUDA 빌드와 CUDA 실행을 사용하지 않습니다. 빌드할 때는 반드시 `--no-cuda`, 실행할 때는 `run_partitions.sh` 또는 `partition_run.sh --no-nvidia`를 사용합니다.
-
-## 13. 참고
-
-원본 가이드:
-
-```text
-GOASP-[08] Autoware Partition-160125-085024.pdf
-```
-
-원본 가이드는 PC 환경에서 Autoware partition feasibility를 검증한 문서이고, 이 문서는 PC/보드에서 실제 빌드/실행하면서 추가된 보정 사항까지 반영한 실행 절차입니다.
