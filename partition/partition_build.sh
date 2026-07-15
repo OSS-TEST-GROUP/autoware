@@ -8,7 +8,7 @@ print_help() {
     echo "Options:"
     echo "  --help          Display this help message"
     echo "  -h              Display this help message"
-    echo "  --repo          Specify the Docker Hub repository (e.g., username/repository)"
+    echo "  --repo          Specify the Docker image repository (e.g., partition-test or username/repository)"
     echo "  --no-cuda       Disable CUDA support"
     echo "  --platform      Specify the platform (default: current platform)"
     echo "  --devel-only    Build devel image only"
@@ -17,7 +17,6 @@ print_help() {
 }
 
 SCRIPT_DIR=$(readlink -f "$(dirname "$0")")
-echo "SCRIPT_DIR:$SCRIPT_DIR"
 WORKSPACE_ROOT="$SCRIPT_DIR/.."
 partitions=()
 

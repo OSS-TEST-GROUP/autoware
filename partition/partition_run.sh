@@ -204,12 +204,13 @@ main() {
     fi
     echo -e "${GREEN}LAUNCH CMD:${NC} ${LAUNCH_CMD}"
     echo -e "${GREEN}HOST SOURCE DIR:${NC} ${HOST_SOURCE_DIR}"
+    echo -e "${GREEN}ROS DOMAIN ID:${NC} ${ROS_DOMAIN_ID:-0}"
     echo -e "${GREEN}-----------------------------------------------------------------${NC}"
 
     # Launch the container
     set -x
-    docker run -it ${RM} --net=host ${GPU_FLAG} ${USER_ID} ${MOUNT_X} \
-        -e XAUTHORITY=${XAUTHORITY} -e XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR -e NVIDIA_DRIVER_CAPABILITIES=all -v /etc/localtime:/etc/localtime:ro \
+    docker run -it ${RM} --net=host --pid=host --ipc=host ${GPU_FLAG} ${USER_ID} ${MOUNT_X} \
+        -e FASTDDS_BUILTIN_TRANSPORTS=UDPv4 -e ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0} -e XAUTHORITY=${XAUTHORITY} -e XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR -e NVIDIA_DRIVER_CAPABILITIES=all -v /etc/localtime:/etc/localtime:ro \
         ${WORKSPACE} ${MAP} ${DATA} ${EXEC} -v ${HOST_SOURCE_DIR}/ros2:/ros2 ${IMAGE} \
         ${LAUNCH_CMD}
 }

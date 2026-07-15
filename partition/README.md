@@ -1,5 +1,7 @@
 # Autoware 파티션 빌드 시스템
 
+PC/보드에서 처음 빌드/실행하는 절차는 repo 루트의 `PARTITION_QUICKSTART.md`를 기준으로 합니다.
+
 ## 1. 개요
 
 이 시스템은 Autoware의 방대한 소스 코드를 기능별 **파티션(Partition)**으로 나누어 모듈화된 Docker 이미지를 빌드하기 위해 설계되었습니다. 이 접근 방식은 전체 Autoware를 빌드하는 대신 필요한 패키지만 포함하는 경량 이미지를 생성하여, 배포를 단순화하고 이미지 크기를 줄이며 빌드 시간을 단축하는 이점을 제공합니다.
@@ -57,20 +59,20 @@ JSON 파일은 다음 두 개의 키를 가져야 합니다.
 현재 사용 중인 PC의 아키텍처에 맞는 이미지를 빌드하여 로컬 Docker 데몬으로 로드합니다.
 
 ```bash
-./partition/partition_build.sh --repo <your_dockerhub_username/your_repo_name>
+./partition/partition_build.sh --repo <image-repo>
 ```
 
 #### 멀티 아키텍처 이미지 빌드 및 푸시
 
-`linux/amd64`와 `linux/arm64` 아키텍처 이미지를 모두 빌드하고, 이를 Manifest List로 묶어 지정된 Docker Hub 레지스트리로 푸시합니다. 이 방법을 사용하면 `docker pull` 명령 실행 시 클라이언트의 아키텍처에 맞는 이미지가 자동으로 다운로드됩니다.
+`linux/amd64`와 `linux/arm64` 아키텍처 이미지를 모두 빌드하고, 이를 Manifest List로 묶어 지정된 registry로 푸시합니다. 이 방법을 사용하면 `docker pull` 명령 실행 시 클라이언트의 아키텍처에 맞는 이미지가 자동으로 다운로드됩니다.
 
 ```bash
-./partition/partition_build.sh --repo <your_dockerhub_username/your_repo_name> --push
+./partition/partition_build.sh --repo <image-repo> --push
 ```
 
 ### 스크립트 옵션
 
--   `--repo <repo>`: (**필수**) 이미지 태그에 사용할 Docker Hub 레포지토리 (예: `myuser/autoware-custom`).
+-   `--repo <repo>`: (**필수**) 이미지 태그에 사용할 Docker image repository (예: `partition-test`, `myuser/autoware-custom`).
 -   `--push`: 멀티 아키텍처 이미지를 빌드하고 레지스트리로 푸시합니다. 이 옵션을 생략하면 로컬 환경용 단일 아키텍처 이미지를 빌드합니다.
 -   `--no-cuda`: CUDA 지원 없이 이미지를 빌드합니다.
 -   `--help`: 도움말 메시지를 표시합니다.
@@ -92,7 +94,7 @@ JSON 파일은 다음 두 개의 키를 가져야 합니다.
 ```
 
 ```bash
-docker run -it --rm <your_dockerhub_username/your_repo_name>:<partition_name>
+docker run -it --rm <image-repo>:<partition_name>
 ```
 
 **중요**: 이 이미지는 정의한 패키지만 포함하고 있으므로, 내부의 노드들을 실행하려면 ROS 2의 launch 시스템을 사용해야 합니다.
