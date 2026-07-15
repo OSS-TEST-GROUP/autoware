@@ -7,62 +7,70 @@ PC와 보드에서 Autoware partition 이미지를 빌드하고 실행하는 공
 
 ```bash
 sudo apt update
-sudo apt install -y git git-lfs python3-vcstool jq
+sudo apt install -y git git-lfs python3-vcstool python3-pip jq unzip x11-xserver-utils
+
+git lfs install
+python3 -m pip install --user gdown
 
 mkdir -p ~/oss
 cd ~/oss
-git clone <repo-url> oss_adsw
+git clone --branch katech-partition --single-branch \
+  https://github.com/OSS-TEST-GROUP/autoware.git oss_adsw
 cd ~/oss/oss_adsw
+git lfs pull
 ```
 
 ## 2. 환경 변수 정하기
 
-Docker image repo 이름은 직접 정합니다.  
-로컬에서만 쓸 거면 임의 이름을 써도 되고, Docker Hub에 push할 거면 `<dockerhub-id>/<repo-name>` 형식으로 씁니다.
+아래 명령은 빌드와 실행에 사용할 같은 터미널에서 실행합니다. 터미널을 새로 열면 `REPO`, `MAP_PATH`, `PLATFORM`을 다시 설정해야 합니다.
+
+`REPO`는 로컬에 생성할 Docker image 이름이고, `MAP_PATH`는 host의 맵 폴더입니다.
 
 ```bash
-REPO=<image-repo>
-MAP_PATH=~/autoware_map/sample-map-planning
-```
-
-예시:
-
-```bash
-REPO=partition-test
-REPO=mydockerid/partition-test
+REPO=autoware-partition
+MAP_PATH="$HOME/autoware_map/sample-map-planning"
 ```
 
 플랫폼은 실행 환경에 맞게 하나만 선택합니다.
 
-PC:
+일반 PC (`uname -m` 결과가 `x86_64`):
 
 ```bash
 PLATFORM=linux/amd64
 ```
 
-ARM64 보드:
+ARM64 보드 (`uname -m` 결과가 `aarch64`):
 
 ```bash
 PLATFORM=linux/arm64
 ```
 
-현재 장비가 ARM64인지 확인:
+현재 장비 확인:
 
 ```bash
 uname -m
 ```
 
-`aarch64`이면 `PLATFORM=linux/arm64`를 사용합니다.
+## 3. 맵 데이터 받기
 
-## 3. 맵 데이터 위치
-
-맵은 host의 `MAP_PATH` 위치에 둡니다.
+샘플 맵을 다운로드하고 압축을 풉니다.
 
 ```bash
+mkdir -p "$HOME/autoware_map"
+
+python3 -m gdown \
+  -O "$HOME/autoware_map/sample-map-planning.zip" \
+  'https://docs.google.com/uc?export=download&id=1499_nsbUbIeturZaDj7jhUownh5fvXHd'
+
+unzip -o "$HOME/autoware_map/sample-map-planning.zip" \
+  -d "$HOME/autoware_map"
+
 ls -al "$MAP_PATH"
 ```
 
-최소 파일:
+다운로드 링크: [sample-map-planning.zip](https://docs.google.com/uc?export=download&id=1499_nsbUbIeturZaDj7jhUownh5fvXHd)
+
+`$MAP_PATH` 안에 최소한 다음 파일이 있어야 합니다.
 
 ```text
 lanelet2_map.osm
@@ -75,9 +83,18 @@ pointcloud_map_metadata.yaml
 
 ## 4. Docker 확인
 
+Docker Engine과 Buildx가 설치되어 있어야 합니다. 설치되어 있지 않으면 [Docker Engine Ubuntu 설치 문서](https://docs.docker.com/engine/install/ubuntu/)를 먼저 진행합니다.
+
 ```bash
 docker --version
 docker buildx version
+docker run --rm hello-world
+```
+
+`permission denied`가 나오면 현재 사용자를 `docker` 그룹에 추가한 뒤 로그아웃하고 다시 로그인합니다.
+
+```bash
+sudo usermod -aG docker "$USER"
 ```
 
 ## 5. 빌드
@@ -102,9 +119,9 @@ docker images | grep "$REPO"
 생성되는 태그:
 
 ```text
-sample-adsw-perception
-sample-adsw-decision
-sample-adsw-control
+autoware-partition:sample-adsw-perception
+autoware-partition:sample-adsw-decision
+autoware-partition:sample-adsw-control
 ```
 
 ## 6. 실행
@@ -241,45 +258,9 @@ ros2 node list | sort | uniq -d
 '
 ```
 
-## 12. CUDA 참고
+## 12. CUDA
 
-현재는 CUDA 빌드와 CUDA 실행을 사용하지 않습니다.  
-이 절차는 문제 재현이나 비교가 필요할 때만 참고합니다.
-
-CUDA 빌드:
-
-```bash
-./partition/partition_build.sh \
-  --repo "$REPO" \
-  --platform "$PLATFORM"
-```
-
-생성되는 CUDA 태그:
-
-```text
-sample-adsw-perception-cuda
-sample-adsw-decision-cuda
-sample-adsw-control-cuda
-```
-
-CUDA runtime 확인이 필요할 때:
-
-```bash
-sudo apt update
-sudo apt install -y nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
-
-docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi
-```
-
-과거에 본 CUDA 관련 문제:
-
-```text
-pull access denied ... cuda-latest
-```
-
-CUDA 빌드에서는 `base-cuda` 이미지가 먼저 로컬에 있어야 합니다. 현재 빌드 스크립트는 CUDA 빌드 시 `base-cuda`도 같이 빌드하도록 보정되어 있습니다.
+현재 배포 및 테스트 절차에서는 CUDA 빌드와 CUDA 실행을 사용하지 않습니다. 빌드할 때는 반드시 `--no-cuda`, 실행할 때는 `run_partitions.sh` 또는 `partition_run.sh --no-nvidia`를 사용합니다.
 
 ## 13. 참고
 
