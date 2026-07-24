@@ -38,7 +38,9 @@ Perception, Decision/Planning, Control 파티션 사이에서 데이터가 전�
 
 ```text
 RViz 더미 객체 배치
-  -> Perception: 객체 생성, 형상 추정, 검출, 추적, 예측
+  -> Perception: 가상 LiDAR Pointcloud 생성
+  -> Sensing: Pointcloud 축소 및 차량 영역 제거
+  -> Perception: CPU 군집화, 형상 추정, 추적, 예측
   -> Decision/Planning: 경로와 속도 계획, 장애물 앞 정지 trajectory 생성
   -> Control: trajectory 추종, 조향/가감속 명령 생성
   -> 차량 시뮬레이터: 명령을 적용하고 차량 상태를 다시 발행
@@ -59,7 +61,7 @@ Planning이 장애물 앞에 정지점과 0 m/s 구간을 넣고 Control이 이�
 
 | 파티션 | 주요 역할 | 다른 파티션으로 보내는 핵심 토픽 |
 | --- | --- | --- |
-| Perception | RViz 더미 객체를 검출 객체로 변환하고 추적 및 미래 움직임을 예측 | `/perception/object_recognition/objects`, `/perception/obstacle_segmentation/pointcloud` |
+| Perception | RViz 객체를 가상 LiDAR Pointcloud로 만들고 Sensing 전처리 후 CPU로 검출·추적·예측 | `/perception/object_recognition/objects`, `/perception/obstacle_segmentation/pointcloud` |
 | Decision/Planning | 경로, 장애물, 차량 상태를 이용해 최종 주행 trajectory 생성 | `/planning/scenario_planning/trajectory` |
 | Control | 최종 trajectory를 추종해 조향 및 가감속 명령 생성 | `/control/command/control_cmd` |
 | Control의 차량 시뮬레이터 | 제어 명령을 차량 운동으로 반영하고 차량 상태 생성 | `/localization/kinematic_state`, `/localization/acceleration`, `/vehicle/status/*` |
@@ -90,10 +92,20 @@ Planning이 장애물 앞에 정지점과 0 m/s 구간을 넣고 Control이 이�
         |
         v
 [Perception: dummy_perception_publisher]
-  +-> /perception/obstacle_segmentation/pointcloud
-  |     sensor_msgs/msg/PointCloud2
-  |
-  +-> /perception/object_recognition/detection/labeled_clusters
+  /sensing/lidar/virtual/pointcloud_raw
+    sensor_msgs/msg/PointCloud2
+        |
+        v
+[Sensing: voxel_grid_downsample_filter_node]
+  /sensing/lidar/concatenated/pointcloud
+        |
+        v
+[Sensing: crop_box_filter_node]
+  /perception/obstacle_segmentation/pointcloud
+        |
+        v
+[Perception: virtual_lidar_euclidean_cluster]
+  /perception/object_recognition/detection/labeled_clusters
         tier4_perception_msgs/msg/DetectedObjectsWithFeature
         |
         v
@@ -175,32 +187,45 @@ RViz의 `Bus`, `Car`, `Pedestrian` 도구는 선택한 위치, 방향, 속도, �
 
 기본 RViz 설정에서 Bus와 Pedestrian의 초기 속도는 0 m/s이고, Car는 3 m/s입니다.
 
-### 5.2 더미 센서 및 객체 검출
+### 5.2 가상 LiDAR 및 CPU 객체 검출
 
-Perception 파티션의 `dummy_perception_publisher`가 `DummyObject`를 받아 다음 두
-종류의 모의 센서 결과를 만듭니다.
+Perception 파티션의 `dummy_perception_publisher`는 `DummyObject`의 위치와 크기를
+이용해 LiDAR 필드가 포함된 가상 Pointcloud만 생성합니다. 검출 객체를 직접
+Planning에 주입하지 않습니다.
 
-1. 객체 인식 경로
-   `/perception/object_recognition/detection/labeled_clusters`
-2. 포인트클라우드 경로
-   `/perception/obstacle_segmentation/pointcloud`
+```text
+/sensing/lidar/virtual/pointcloud_raw
+  -> voxel_grid_downsample_filter_node
+  -> /sensing/lidar/concatenated/pointcloud
+  -> crop_box_filter_node
+  -> /perception/obstacle_segmentation/pointcloud
+  -> virtual_lidar_euclidean_cluster
+  -> /perception/object_recognition/detection/labeled_clusters
+```
 
-이것은 실제 LiDAR 드라이버와 DNN 검출기를 통과한 결과가 아닙니다. RViz에서
-정의한 객체를 사용해 검출 객체와 포인트클라우드를 만들어 실제 Perception의
-후단 처리와 Planning 입력 형식을 시험하는 시뮬레이션 경로입니다.
+`voxel_grid_downsample_filter_node`는 점 수를 줄이고,
+`crop_box_filter_node`는 차량 자체 영역을 제거합니다.
+`virtual_lidar_euclidean_cluster`는 GPU나 CUDA 없이 PCL 기반 CPU 군집화를
+수행합니다.
 
-현재 설정은 `detection_successful_rate=0.999`이고, 객체 인식 기능이 활성화되어
-있습니다.
+실제 LiDAR 하드웨어 드라이버와 DNN 분류기를 실행하는 구성은 아닙니다. 따라서
+RViz에서 Bus, Car, Pedestrian 도구를 사용해도 CPU 군집화 이후 객체 분류는
+`UNKNOWN`이 됩니다. 현재 목적은 더미 검출 객체의 직통 전달이 아니라,
+Pointcloud가 Sensing 전처리와 Perception 검출을 거쳐 Planning에 전달되는 흐름을
+검증하는 것입니다.
 
 ### 5.3 Perception 내부 처리 순서
 
 | 순서 | 노드 | 입력 | 출력 | 처리 내용 |
 | --- | --- | --- | --- | --- |
-| 1 | `dummy_perception_publisher` | `/simulation/dummy_perception_publisher/object_info` | `.../detection/labeled_clusters`, `/perception/obstacle_segmentation/pointcloud` | 더미 객체를 모의 검출 및 포인트클라우드로 변환 |
-| 2 | `shape_estimation` | `.../detection/labeled_clusters` | `.../detection/objects_with_feature` | 클러스터에서 객체 형상 추정 |
-| 3 | `detected_object_feature_remover` | `.../detection/objects_with_feature` | `.../detection/objects` | 특징 필드를 제거해 표준 `DetectedObjects` 생성 |
-| 4 | `multi_object_tracker` | `.../detection/objects` | `.../tracking/objects` | 프레임 간 객체 ID, 위치, 속도를 추적 |
-| 5 | `map_based_prediction` | `.../tracking/objects`, `/map/vector_map` | `/perception/object_recognition/objects` | 지도와 추적 결과를 이용해 객체의 예측 경로 생성 |
+| 1 | `dummy_perception_publisher` | `/simulation/dummy_perception_publisher/object_info` | `/sensing/lidar/virtual/pointcloud_raw` | 더미 객체 형상을 LiDAR 형식 Pointcloud로 변환 |
+| 2 | `voxel_grid_downsample_filter_node` | `/sensing/lidar/virtual/pointcloud_raw` | `/sensing/lidar/concatenated/pointcloud` | CPU voxel downsample |
+| 3 | `crop_box_filter_node` | `/sensing/lidar/concatenated/pointcloud` | `/perception/obstacle_segmentation/pointcloud` | 차량 자체 영역 제거 |
+| 4 | `virtual_lidar_euclidean_cluster` | `/perception/obstacle_segmentation/pointcloud` | `.../detection/labeled_clusters` | CPU Euclidean 군집화 및 UNKNOWN 객체 생성 |
+| 5 | `shape_estimation` | `.../detection/labeled_clusters` | `.../detection/objects_with_feature` | 클러스터에서 객체 형상 추정 |
+| 6 | `detected_object_feature_remover` | `.../detection/objects_with_feature` | `.../detection/objects` | 특징 필드를 제거해 표준 `DetectedObjects` 생성 |
+| 7 | `multi_object_tracker` | `.../detection/objects` | `.../tracking/objects` | 프레임 간 객체 ID, 위치, 속도를 추적 |
+| 8 | `map_based_prediction` | `.../tracking/objects`, `/map/vector_map` | `/perception/object_recognition/objects` | 지도와 추적 결과를 이용해 객체의 예측 경로 생성 |
 
 마지막 `PredictedObjects` 토픽이 Perception 파티션의 대표 객체 출력입니다.
 Decision/Planning의 여러 플래너와 Control의 안전 감시 노드가 이 토픽을
