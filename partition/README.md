@@ -4,7 +4,10 @@ PC/보드에서 처음 빌드/실행하는 절차는 repo 루트의 `PARTITION_Q
 
 ## 1. 개요
 
-이 시스템은 Autoware의 방대한 소스 코드를 기능별 **파티션(Partition)**으로 나누어 모듈화된 Docker 이미지를 빌드하기 위해 설계되었습니다. 이 접근 방식은 전체 Autoware를 빌드하는 대신 필요한 패키지만 포함하는 경량 이미지를 생성하여, 배포를 단순화하고 이미지 크기를 줄이며 빌드 시간을 단축하는 이점을 제공합니다.
+이 시스템은 Autoware의 기능 컴포넌트를 **Perception**, **Decision**, **Control**
+파티션으로 나누어 각각의 Docker 이미지를 빌드합니다. 현재 구성은
+**컴포넌트 기반 파티셔닝**이며, 파티션별 기능 영역과 보완 의존성만 이미지에
+포함하여 배포 단위를 분리합니다.
 
 ## 2. 사전 요구 사항
 
@@ -32,8 +35,8 @@ docker buildx create --name mybuilder --driver docker-container --use
 
 JSON 파일은 다음 두 개의 키를 가져야 합니다.
 
--   `packages`: 파티션에 포함할 ROS 2 패키지 이름의 배열입니다.
--   `folders`: 파티션에 포함할 추가적인 폴더 경로의 배열입니다.
+-   `folders`: 파티션을 구성하는 기능 컴포넌트의 소스 폴더 배열입니다. 폴더 아래의 ROS 2 패키지가 함께 포함됩니다.
+-   `packages`: `folders` 범위 밖에서 추가로 필요한 launch, 설정 및 빌드·실행 의존 패키지 배열입니다.
 
 **예시: `my_perception_partition.json`**
 
@@ -80,8 +83,8 @@ JSON 파일은 다음 두 개의 키를 가져야 합니다.
 ## 4. 시스템 동작 원리
 
 1.  `partition_build.sh` 스크립트는 `partition/partition_config` 디렉토리의 모든 `.json` 파일을 순회합니다.
-2.  각 JSON 파일로부터 `packages`와 `folders` 목록을 파싱합니다.
-3.  `Dockerfile.template` 파일의 플레이스홀더(`%COPY_LIST%`, `%BIND_LIST%`)를 파싱된 패키지 및 폴더 경로로 치환하여, 각 파티션에 대한 전용 `[partition_name]_Dockerfile`을 생성합니다.
+2.  각 JSON 파일로부터 컴포넌트 소스 범위인 `folders`와 보완 의존성인 `packages` 목록을 파싱합니다.
+3.  `packages`의 실제 `package.xml` 경로를 찾고 `folders`와 함께 `Dockerfile.template`의 플레이스홀더(`%COPY_LIST%`, `%BIND_LIST%`)에 반영하여 각 파티션의 `[partition_name]_Dockerfile`을 생성합니다.
 4.  `docker buildx bake` 명령을 호출하여 생성된 Dockerfile과 `docker-bake.hcl` 설정에 따라 이미지를 빌드합니다.
 5.  `--push` 옵션 사용 여부에 따라 `partition-multi-platform` 타겟(멀티 아키텍처) 또는 `partition` 타겟(단일 아키텍처)을 선택하여 빌드를 진행합니다.
 
@@ -97,7 +100,8 @@ JSON 파일은 다음 두 개의 키를 가져야 합니다.
 docker run -it --rm <image-repo>:<partition_name>
 ```
 
-**중요**: 이 이미지는 정의한 패키지만 포함하고 있으므로, 내부의 노드들을 실행하려면 ROS 2의 launch 시스템을 사용해야 합니다.
+**중요**: 각 이미지는 해당 파티션의 컴포넌트 폴더와 보완 패키지만 포함합니다.
+내부 노드는 ROS 2 launch 시스템으로 실행합니다.
 
 ### 노드 실행 방법
 

@@ -15,6 +15,9 @@ log/
 # Python
 *.pyc
 
+# LibreOffice
+.~lock.*#
+
 # Jetbrains
 .idea/
 
