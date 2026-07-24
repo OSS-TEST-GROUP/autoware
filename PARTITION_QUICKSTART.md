@@ -3,6 +3,13 @@
 PC와 보드에서 Autoware partition 이미지를 빌드하고 실행하는 공통 절차입니다.  
 현재 기본 실행은 CUDA를 사용하지 않습니다.
 
+파티션 사이의 노드 및 토픽 흐름은 [PARTITION_DATA_FLOW.md](PARTITION_DATA_FLOW.md)를 참고합니다.
+
+현재 구성은 Autoware의 기능 컴포넌트를 Perception, Decision, Control 세 파티션으로
+묶는 **컴포넌트 기반 파티셔닝**입니다. `partition/partition_config/*.json`의 `folders`가
+컴포넌트 소스 범위를 정의하고, `packages`는 해당 범위 밖에서 필요한 launch,
+설정 및 빌드·실행 의존 패키지를 보완합니다.
+
 ## 1. Repo 받기
 
 ```bash
